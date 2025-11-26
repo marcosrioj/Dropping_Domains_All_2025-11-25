@@ -127,6 +127,14 @@ select:focus {
   border-color: transparent;
 }
 
+/* Keep native dropdown menus in dark mode where supported */
+select,
+option {
+  color-scheme: dark;
+  background-color: #0b1024;
+  color: #eef1f7;
+}
+
 .chips {
   margin-top: 14px;
 }
@@ -193,26 +201,47 @@ select:focus {
   position: relative;
 }
 
+.list-header {
+  display: grid;
+  grid-template-columns: 1.5fr 0.7fr 0.5fr 0.5fr 0.8fr 0.8fr 0.6fr;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.list-header__cell {
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.list-header__cell.active {
+  color: #eef1f7;
+}
+
 .list {
   will-change: transform;
 }
 
 .list-row {
   display: grid;
-  grid-template-columns: 1.4fr 0.9fr 0.8fr;
+  grid-template-columns: 1.5fr 0.7fr 0.5fr 0.5fr 0.8fr 0.8fr 0.6fr;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   align-items: center;
 }
 
-.list-row__title {
+.list-row__domain {
   display: flex;
   gap: 12px;
   align-items: center;
   min-width: 0;
 }
 
-.list-row__title .domain {
+.list-row__domain .domain {
   font-weight: 600;
   font-size: 15px;
   white-space: nowrap;
@@ -231,28 +260,12 @@ select:focus {
   letter-spacing: 0.05em;
 }
 
-.list-row__meta {
-  display: flex;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.list-row__score {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .score {
   font-weight: 700;
   font-size: 18px;
 }
 
-.metrics {
-  display: flex;
-  gap: 10px;
+.meta {
   color: var(--muted);
   font-size: 13px;
 }
@@ -268,6 +281,14 @@ select:focus {
 
 .count {
   color: var(--muted);
+}
+
+.pagination {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 @media (max-width: 900px) {

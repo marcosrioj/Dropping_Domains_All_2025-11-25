@@ -193,7 +193,12 @@ export const FilterPanel = ({ filters, onChange, tldOptions, onReset }: Props) =
           <span>Sort by</span>
           <select
             value={filters.sortBy}
-            onChange={(e) => onChange({ sortBy: e.target.value as SortKey })}
+            onChange={(e) => {
+              const nextKey = e.target.value as SortKey;
+              const defaultDir: FilterState['sortDir'] =
+                nextKey === 'price' || nextKey === 'length' ? 'asc' : 'desc';
+              onChange({ sortBy: nextKey, sortDir: defaultDir });
+            }}
           >
             {Object.entries(sortLabels).map(([key, label]) => (
               <option key={key} value={key}>
@@ -204,7 +209,7 @@ export const FilterPanel = ({ filters, onChange, tldOptions, onReset }: Props) =
         </label>
 
         <label className="field">
-          <span>Max results</span>
+          <span>Results per page</span>
           <input
             type="number"
             min={50}

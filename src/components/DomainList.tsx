@@ -1,44 +1,64 @@
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
-import { DomainRecord } from '../types';
+import { DomainRecord, SortDir, SortKey } from '../types';
 
 type Props = {
   records: DomainRecord[];
   width: number;
   height: number;
+  sortBy: SortKey;
+  sortDir: SortDir;
+  onChangeSort: (key: SortKey) => void;
 };
 
-export const DomainList = ({ records, width, height }: Props) => {
+const headers: { key: SortKey; label: string }[] = [
+  { key: 'score', label: 'Score' },
+  { key: 'alphabetical', label: 'Domain' },
+  { key: 'length', label: 'Len' },
+  { key: 'tld', label: 'TLD' },
+  { key: 'traffic', label: 'Traffic' },
+  { key: 'backlinks', label: 'Links' },
+  { key: 'price', label: 'Price' }
+];
+
+export const DomainList = ({ records, width, height, sortBy, sortDir, onChangeSort }: Props) => {
   const Row = ({ index, style }: ListChildComponentProps) => {
     const record = records[index];
+    const traffic = record.metrics.traffic;
+    const backlinks = record.metrics.backlinks;
+    const price = record.metrics.price;
+
     return (
       <div className="list-row" style={style}>
-        <div className="list-row__title">
+        <div className="list-row__domain">
           <div className="pill">{record.tld}</div>
-          <strong className="domain">{record.domain}</strong>
+          <div className="domain">{record.domain}</div>
         </div>
-        <div className="list-row__meta">
-          <span>len {record.length}</span>
-          <span>{record.hasHyphen ? 'hyphen' : 'clean'}</span>
-          <span>{record.hasNumber ? 'digits' : 'letters'}</span>
-        </div>
-        <div className="list-row__score">
-          <div className="score">{record.score}</div>
-          <div className="metrics">
-            {record.metrics.traffic !== undefined && (
-              <span>traffic {record.metrics.traffic.toLocaleString()}</span>
-            )}
-            {record.metrics.backlinks !== undefined && (
-              <span>links {record.metrics.backlinks.toLocaleString()}</span>
-            )}
-            {record.metrics.price !== undefined && <span>${record.metrics.price}</span>}
-          </div>
-        </div>
+        <div className="score">{record.score}</div>
+        <div className="meta">{record.length}</div>
+        <div className="meta">{record.tld}</div>
+        <div className="meta">{traffic !== undefined ? traffic.toLocaleString() : '—'}</div>
+        <div className="meta">{backlinks !== undefined ? backlinks.toLocaleString() : '—'}</div>
+        <div className="meta">{price !== undefined ? `$${price}` : '—'}</div>
       </div>
     );
   };
 
   return (
     <div className="list-shell">
+      <div className="list-header">
+        {headers.map((h) => {
+          const active = sortBy === h.key;
+          return (
+            <button
+              key={h.key}
+              className={`list-header__cell ${active ? 'active' : ''}`}
+              onClick={() => onChangeSort(h.key)}
+            >
+              {h.label} {active ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+            </button>
+          );
+        })}
+      </div>
       <FixedSizeList
         itemCount={records.length}
         itemSize={72}

@@ -28,6 +28,8 @@ export type SortKey =
   | 'backlinks'
   | 'price';
 
+export type SortDir = 'asc' | 'desc';
+
 export type FilterState = {
   search: string;
   include: string;
@@ -39,6 +41,7 @@ export type FilterState = {
   digits: 'any' | 'allow' | 'block';
   humanWords: 'any' | 'require';
   sortBy: SortKey;
+  sortDir: SortDir;
   maxResults: number;
   priceMax?: number;
   trafficMin?: number;

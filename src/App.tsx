@@ -1,9 +1,9 @@
-import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DomainList } from './components/DomainList';
 import { FilterPanel } from './components/FilterPanel';
 import { useCsvLoader } from './hooks/useCsvLoader';
 import { parseKeywords, uniqueTlds } from './lib/domain-utils';
-import { DomainRecord, FilterState, SortKey } from './types';
+import { DomainRecord, FilterState, SortDir, SortKey } from './types';
 
 const createDefaultFilters = (): FilterState => ({
   search: '',
@@ -16,20 +16,40 @@ const createDefaultFilters = (): FilterState => ({
   digits: 'any',
   humanWords: 'any',
   sortBy: 'score',
+  sortDir: 'desc',
   maxResults: 500,
   priceMax: undefined,
   trafficMin: undefined,
   backlinksMin: undefined
 });
 
-const sorters: Record<SortKey, (a: DomainRecord, b: DomainRecord) => number> = {
-  score: (a, b) => b.score - a.score || b.wordScore - a.wordScore || a.length - b.length,
-  length: (a, b) => a.length - b.length || a.domain.localeCompare(b.domain),
-  alphabetical: (a, b) => a.domain.localeCompare(b.domain),
-  tld: (a, b) => a.tld.localeCompare(b.tld) || a.domain.localeCompare(b.domain),
-  traffic: (a, b) => (b.metrics.traffic ?? -Infinity) - (a.metrics.traffic ?? -Infinity),
-  backlinks: (a, b) => (b.metrics.backlinks ?? -Infinity) - (a.metrics.backlinks ?? -Infinity),
-  price: (a, b) => (a.metrics.price ?? Infinity) - (b.metrics.price ?? Infinity)
+const compare = (a: number | string | undefined, b: number | string | undefined) => {
+  if (a === undefined && b === undefined) return 0;
+  if (a === undefined) return -1;
+  if (b === undefined) return 1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+};
+
+const getSorter = (key: SortKey): ((a: DomainRecord, b: DomainRecord) => number) => {
+  switch (key) {
+    case 'score':
+      return (a, b) => compare(a.score, b.score) || compare(a.wordScore, b.wordScore) || compare(b.length, a.length);
+    case 'length':
+      return (a, b) => compare(a.length, b.length) || a.domain.localeCompare(b.domain);
+    case 'alphabetical':
+      return (a, b) => a.domain.localeCompare(b.domain);
+    case 'tld':
+      return (a, b) => a.tld.localeCompare(b.tld) || a.domain.localeCompare(b.domain);
+    case 'traffic':
+      return (a, b) => compare(a.metrics.traffic, b.metrics.traffic);
+    case 'backlinks':
+      return (a, b) => compare(a.metrics.backlinks, b.metrics.backlinks);
+    case 'price':
+      return (a, b) => compare(a.metrics.price, b.metrics.price);
+    default:
+      return () => 0;
+  }
 };
 
 const fileName = 'Dropping_Domains_All_2025-11-25.csv';
@@ -37,6 +57,7 @@ const fileName = 'Dropping_Domains_All_2025-11-25.csv';
 const App = () => {
   const { data, loading, error } = useCsvLoader(fileName);
   const [filters, setFilters] = useState<FilterState>(createDefaultFilters);
+  const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(filters.search.toLowerCase());
 
   const listContainerRef = useRef<HTMLDivElement | null>(null);
@@ -49,7 +70,7 @@ const App = () => {
       const rect = entries[0].contentRect;
       setListSize({
         width: rect.width,
-        height: Math.max(320, rect.height - 8)
+        height: Math.max(300, rect.height - 56) // leave room for header row
       });
     });
     observer.observe(element);
@@ -58,8 +79,8 @@ const App = () => {
 
   const tldOptions = useMemo(() => uniqueTlds(data), [data]);
 
-  const { visibleRecords, totalFiltered } = useMemo(() => {
-    if (!data.length) return { visibleRecords: [], totalFiltered: 0 };
+  const { visibleRecords, totalFiltered, totalPages, currentPage } = useMemo(() => {
+    if (!data.length) return { visibleRecords: [], totalFiltered: 0, totalPages: 1, currentPage: 1 };
 
     const includeTerms = parseKeywords(filters.include);
     const excludeTerms = parseKeywords(filters.exclude);
@@ -99,12 +120,49 @@ const App = () => {
       results.push(record);
     }
 
-    const sorted = results.sort(sorters[filters.sortBy]);
+    const sorted = results.sort(getSorter(filters.sortBy));
+    if (filters.sortDir === 'desc') {
+      sorted.reverse();
+    }
+
     const limit = Math.max(50, filters.maxResults || 500);
-    return { visibleRecords: sorted.slice(0, limit), totalFiltered: sorted.length };
-  }, [data, deferredSearch, filters]);
+    const totalPagesCalc = Math.max(1, Math.ceil(sorted.length / limit));
+    const currentPage = Math.min(page, totalPagesCalc);
+    const start = (currentPage - 1) * limit;
+    const end = start + limit;
+
+    return {
+      visibleRecords: sorted.slice(start, end),
+      totalFiltered: sorted.length,
+      totalPages: totalPagesCalc,
+      currentPage
+    };
+  }, [data, deferredSearch, filters, page]);
+
+  // Clamp page when filters shrink result set.
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const best = visibleRecords[0];
+
+  const handleFilterChange = (patch: Partial<FilterState>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  };
+
+  const toggleSort = (key: SortKey) => {
+    setFilters((prev) => {
+      if (prev.sortBy === key) {
+        const nextDir: SortDir = prev.sortDir === 'asc' ? 'desc' : 'asc';
+        return { ...prev, sortDir: nextDir };
+      }
+      return { ...prev, sortBy: key, sortDir: key === 'price' || key === 'length' ? 'asc' : 'desc' };
+    });
+    setPage(1);
+  };
 
   return (
     <main className="app">
@@ -134,9 +192,12 @@ const App = () => {
 
       <FilterPanel
         filters={filters}
-        onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+        onChange={handleFilterChange}
         tldOptions={tldOptions}
-        onReset={() => setFilters(createDefaultFilters())}
+        onReset={() => {
+          setFilters(createDefaultFilters());
+          setPage(1);
+        }}
       />
 
       <section className="panel list-panel">
@@ -147,7 +208,7 @@ const App = () => {
           </div>
           <div className="count">
             Showing {visibleRecords.length.toLocaleString()} of {totalFiltered.toLocaleString()} filtered (
-            {data.length.toLocaleString()} loaded)
+            page {currentPage} / {totalPages})
           </div>
         </div>
 
@@ -158,9 +219,34 @@ const App = () => {
             <div className="notice">No domains match the current filters.</div>
           )}
           {!error && !loading && visibleRecords.length > 0 && (
-            <DomainList records={visibleRecords} width={listSize.width} height={listSize.height} />
+            <DomainList
+              records={visibleRecords}
+              width={listSize.width}
+              height={listSize.height}
+              sortBy={filters.sortBy}
+              sortDir={filters.sortDir}
+              onChangeSort={toggleSort}
+            />
           )}
         </div>
+
+        {!error && !loading && totalFiltered > 0 && (
+          <div className="pagination">
+            <button className="ghost" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              className="ghost"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </section>
     </main>
   );

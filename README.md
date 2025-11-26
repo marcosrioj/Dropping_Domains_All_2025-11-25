@@ -21,9 +21,9 @@ npm run dev
 - Streamed CSV parsing (Papaparse chunking; worker disabled to allow comment stripping).
 - Automatic comment removal and basic numeric detection (traffic, backlinks, price).
 - Derived domain metrics (length, hyphen/digit flags, vowel ratio, smart score).
-- Rich filters: search, include/exclude keywords, TLD chips, length range, hyphen/digit policy, human-word requirement (20k English wordlist + prefix/suffix/compound heuristics; ignores tokens <3 chars), min traffic/backlinks, max price, and result cap.
-- Sorting by score, length, alpha, TLD, traffic, backlinks, or price.
-- Virtualized result list (react-window) so only visible rows render.
+- Rich filters: search, include/exclude keywords, TLD chips, length range, hyphen/digit policy, human-word requirement (20k English wordlist + prefix/suffix/compound heuristics; ignores tokens <3 chars), min traffic/backlinks, max price, and page-size cap.
+- Sorting by score, length, alpha, TLD, traffic, backlinks, or price (via dropdown or clickable headers with asc/desc toggles).
+- Pagination with per-page size control plus virtualized rendering for each page slice.
 
 ### Notes
 
