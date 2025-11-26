@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import { DomainList } from './components/DomainList';
 import { FilterPanel } from './components/FilterPanel';
 import { useCsvLoader } from './hooks/useCsvLoader';
+import { useTrendScores } from './hooks/useTrendScores';
 import { parseKeywords, uniqueTlds } from './lib/domain-utils';
 import { DomainRecord, FilterState, SortDir, SortKey } from './types';
 
@@ -15,6 +16,8 @@ const createDefaultFilters = (): FilterState => ({
   hyphens: 'any',
   digits: 'any',
   humanWords: 'any',
+  trendMode: 'any',
+  trendMin: 1,
   sortBy: 'score',
   sortDir: 'desc',
   maxResults: 500,
@@ -31,7 +34,10 @@ const compare = (a: number | string | undefined, b: number | string | undefined)
   return String(a).localeCompare(String(b));
 };
 
-const getSorter = (key: SortKey): ((a: DomainRecord, b: DomainRecord) => number) => {
+const getSorter = (
+  key: SortKey,
+  trendScores: Map<string, number>
+): ((a: DomainRecord, b: DomainRecord) => number) => {
   switch (key) {
     case 'score':
       return (a, b) => compare(a.score, b.score) || compare(a.wordScore, b.wordScore) || compare(b.length, a.length);
@@ -47,6 +53,8 @@ const getSorter = (key: SortKey): ((a: DomainRecord, b: DomainRecord) => number)
       return (a, b) => compare(a.metrics.backlinks, b.metrics.backlinks);
     case 'price':
       return (a, b) => compare(a.metrics.price, b.metrics.price);
+    case 'trend':
+      return (a, b) => compare(trendScores.get(a.domain) ?? 0, trendScores.get(b.domain) ?? 0);
     default:
       return () => 0;
   }
@@ -79,8 +87,8 @@ const App = () => {
 
   const tldOptions = useMemo(() => uniqueTlds(data), [data]);
 
-  const { visibleRecords, totalFiltered, totalPages, currentPage } = useMemo(() => {
-    if (!data.length) return { visibleRecords: [], totalFiltered: 0, totalPages: 1, currentPage: 1 };
+  const baseFiltered = useMemo(() => {
+    if (!data.length) return [];
 
     const includeTerms = parseKeywords(filters.include);
     const excludeTerms = parseKeywords(filters.exclude);
@@ -120,7 +128,20 @@ const App = () => {
       results.push(record);
     }
 
-    const sorted = results.sort(getSorter(filters.sortBy));
+    return results;
+  }, [data, deferredSearch, filters]);
+
+  const trendTargets = useMemo(() => baseFiltered.slice(0, 400).map((r) => r.domain), [baseFiltered]);
+  const { scores: trendScores, loading: trendLoading } = useTrendScores(trendTargets);
+
+  const { visibleRecords, totalFiltered, totalPages, currentPage } = useMemo(() => {
+    if (!baseFiltered.length) return { visibleRecords: [], totalFiltered: 0, totalPages: 1, currentPage: 1 };
+
+    const withTrend = filters.trendMode === 'require'
+      ? baseFiltered.filter((r) => (trendScores.get(r.domain) ?? 0) >= filters.trendMin)
+      : baseFiltered;
+
+    const sorted = withTrend.sort(getSorter(filters.sortBy, trendScores));
     if (filters.sortDir === 'desc') {
       sorted.reverse();
     }
@@ -137,7 +158,7 @@ const App = () => {
       totalPages: totalPagesCalc,
       currentPage
     };
-  }, [data, deferredSearch, filters, page]);
+  }, [baseFiltered, filters, page, trendScores]);
 
   // Clamp page when filters shrink result set.
   useEffect(() => {
@@ -187,6 +208,10 @@ const App = () => {
             <p className="eyebrow">Top pick</p>
             <strong>{best ? `${best.domain} (${best.score})` : '—'}</strong>
           </div>
+          <div className="stat">
+            <p className="eyebrow">Trend lookups</p>
+            <strong>{trendLoading ? 'Checking…' : `${trendScores.size}`}</strong>
+          </div>
         </div>
       </header>
 
@@ -226,6 +251,7 @@ const App = () => {
               sortBy={filters.sortBy}
               sortDir={filters.sortDir}
               onChangeSort={toggleSort}
+              trendScores={trendScores}
             />
           )}
         </div>

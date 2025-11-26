@@ -8,11 +8,13 @@ type Props = {
   sortBy: SortKey;
   sortDir: SortDir;
   onChangeSort: (key: SortKey) => void;
+  trendScores: Map<string, number>;
 };
 
 const headers: { key: SortKey; label: string }[] = [
   { key: 'score', label: 'Score' },
   { key: 'alphabetical', label: 'Domain' },
+  { key: 'trend', label: 'Trend' },
   { key: 'length', label: 'Len' },
   { key: 'tld', label: 'TLD' },
   { key: 'traffic', label: 'Traffic' },
@@ -20,9 +22,18 @@ const headers: { key: SortKey; label: string }[] = [
   { key: 'price', label: 'Price' }
 ];
 
-export const DomainList = ({ records, width, height, sortBy, sortDir, onChangeSort }: Props) => {
+export const DomainList = ({
+  records,
+  width,
+  height,
+  sortBy,
+  sortDir,
+  onChangeSort,
+  trendScores
+}: Props) => {
   const Row = ({ index, style }: ListChildComponentProps) => {
     const record = records[index];
+    const trend = trendScores.get(record.domain);
     const traffic = record.metrics.traffic;
     const backlinks = record.metrics.backlinks;
     const price = record.metrics.price;
@@ -34,6 +45,7 @@ export const DomainList = ({ records, width, height, sortBy, sortDir, onChangeSo
           <div className="domain">{record.domain}</div>
         </div>
         <div className="score">{record.score}</div>
+        <div className="meta">{trend !== undefined ? trend : '—'}</div>
         <div className="meta">{record.length}</div>
         <div className="meta">{record.tld}</div>
         <div className="meta">{traffic !== undefined ? traffic.toLocaleString() : '—'}</div>

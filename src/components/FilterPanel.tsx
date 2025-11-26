@@ -24,6 +24,11 @@ const humanOptions = [
   { label: 'Must include real words', value: 'require' }
 ] as const;
 
+const trendOptions = [
+  { label: 'Ignore trend', value: 'any' },
+  { label: 'Require trending', value: 'require' }
+] as const;
+
 const sortLabels: Record<SortKey, string> = {
   score: 'Smart score',
   length: 'Length (short first)',
@@ -31,7 +36,8 @@ const sortLabels: Record<SortKey, string> = {
   tld: 'TLD',
   traffic: 'Traffic',
   backlinks: 'Backlinks',
-  price: 'Price (low first)'
+  price: 'Price (low first)',
+  trend: 'Trend hits'
 };
 
 export const FilterPanel = ({ filters, onChange, tldOptions, onReset }: Props) => {
@@ -148,6 +154,30 @@ export const FilterPanel = ({ filters, onChange, tldOptions, onReset }: Props) =
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="field">
+          <span>Trend check</span>
+          <select
+            value={filters.trendMode}
+            onChange={(e) => onChange({ trendMode: e.target.value as FilterState['trendMode'] })}
+          >
+            {trendOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>Trend minimum hits</span>
+          <input
+            type="number"
+            min={0}
+            value={filters.trendMin}
+            onChange={(e) => onChange({ trendMin: Number(e.target.value) || 0 })}
+          />
         </label>
 
         <label className="field">

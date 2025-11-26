@@ -26,7 +26,8 @@ export type SortKey =
   | 'tld'
   | 'traffic'
   | 'backlinks'
-  | 'price';
+  | 'price'
+  | 'trend';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -42,6 +43,8 @@ export type FilterState = {
   humanWords: 'any' | 'require';
   sortBy: SortKey;
   sortDir: SortDir;
+  trendMode: 'any' | 'require';
+  trendMin: number;
   maxResults: number;
   priceMax?: number;
   trafficMin?: number;
