@@ -7,6 +7,8 @@ export type DomainRecord = {
   length: number;
   hasHyphen: boolean;
   hasNumber: boolean;
+  hasHumanWords: boolean;
+  wordScore: number;
   keywords: string[];
   score: number;
   metrics: {
@@ -35,6 +37,7 @@ export type FilterState = {
   lengthMax: number;
   hyphens: 'any' | 'allow' | 'block';
   digits: 'any' | 'allow' | 'block';
+  humanWords: 'any' | 'require';
   sortBy: SortKey;
   maxResults: number;
   priceMax?: number;

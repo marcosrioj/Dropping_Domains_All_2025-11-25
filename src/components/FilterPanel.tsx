@@ -19,6 +19,11 @@ const digitOptions = [
   { label: 'Must have digits', value: 'allow' }
 ] as const;
 
+const humanOptions = [
+  { label: 'Any names', value: 'any' },
+  { label: 'Must include real words', value: 'require' }
+] as const;
+
 const sortLabels: Record<SortKey, string> = {
   score: 'Smart score',
   length: 'Length (short first)',
@@ -124,6 +129,20 @@ export const FilterPanel = ({ filters, onChange, tldOptions, onReset }: Props) =
             onChange={(e) => onChange({ digits: e.target.value as FilterState['digits'] })}
           >
             {digitOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>Human words</span>
+          <select
+            value={filters.humanWords}
+            onChange={(e) => onChange({ humanWords: e.target.value as FilterState['humanWords'] })}
+          >
+            {humanOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

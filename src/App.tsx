@@ -14,6 +14,7 @@ const createDefaultFilters = (): FilterState => ({
   lengthMax: 32,
   hyphens: 'any',
   digits: 'any',
+  humanWords: 'any',
   sortBy: 'score',
   maxResults: 500,
   priceMax: undefined,
@@ -22,7 +23,7 @@ const createDefaultFilters = (): FilterState => ({
 });
 
 const sorters: Record<SortKey, (a: DomainRecord, b: DomainRecord) => number> = {
-  score: (a, b) => b.score - a.score || a.length - b.length,
+  score: (a, b) => b.score - a.score || b.wordScore - a.wordScore || a.length - b.length,
   length: (a, b) => a.length - b.length || a.domain.localeCompare(b.domain),
   alphabetical: (a, b) => a.domain.localeCompare(b.domain),
   tld: (a, b) => a.tld.localeCompare(b.tld) || a.domain.localeCompare(b.domain),
@@ -57,8 +58,8 @@ const App = () => {
 
   const tldOptions = useMemo(() => uniqueTlds(data), [data]);
 
-  const filteredRecords = useMemo(() => {
-    if (!data.length) return [];
+  const { visibleRecords, totalFiltered } = useMemo(() => {
+    if (!data.length) return { visibleRecords: [], totalFiltered: 0 };
 
     const includeTerms = parseKeywords(filters.include);
     const excludeTerms = parseKeywords(filters.exclude);
@@ -76,6 +77,7 @@ const App = () => {
       if (filters.priceMax !== undefined) {
         if (record.metrics.price !== undefined && record.metrics.price > filters.priceMax) continue;
       }
+      if (filters.humanWords === 'require' && !record.hasHumanWords) continue;
       if (filters.trafficMin !== undefined) {
         if ((record.metrics.traffic ?? 0) < filters.trafficMin) continue;
       }
@@ -99,10 +101,10 @@ const App = () => {
 
     const sorted = results.sort(sorters[filters.sortBy]);
     const limit = Math.max(50, filters.maxResults || 500);
-    return sorted.slice(0, limit);
+    return { visibleRecords: sorted.slice(0, limit), totalFiltered: sorted.length };
   }, [data, deferredSearch, filters]);
 
-  const best = filteredRecords[0];
+  const best = visibleRecords[0];
 
   return (
     <main className="app">
@@ -121,7 +123,7 @@ const App = () => {
           </div>
           <div className="stat">
             <p className="eyebrow">Filtered now</p>
-            <strong>{loading ? '—' : filteredRecords.length.toLocaleString()}</strong>
+            <strong>{loading ? '—' : totalFiltered.toLocaleString()}</strong>
           </div>
           <div className="stat">
             <p className="eyebrow">Top pick</p>
@@ -144,18 +146,19 @@ const App = () => {
             <h2 className="panel__title">Virtualized list for huge drops</h2>
           </div>
           <div className="count">
-            Showing {filteredRecords.length.toLocaleString()} of {data.length.toLocaleString()}
+            Showing {visibleRecords.length.toLocaleString()} of {totalFiltered.toLocaleString()} filtered (
+            {data.length.toLocaleString()} loaded)
           </div>
         </div>
 
         <div className="list-container" ref={listContainerRef}>
           {error && <div className="notice error">Failed to load CSV: {error}</div>}
           {!error && loading && <div className="notice">Parsing CSV…</div>}
-          {!error && !loading && !filteredRecords.length && (
+          {!error && !loading && !visibleRecords.length && (
             <div className="notice">No domains match the current filters.</div>
           )}
-          {!error && !loading && filteredRecords.length > 0 && (
-            <DomainList records={filteredRecords} width={listSize.width} height={listSize.height} />
+          {!error && !loading && visibleRecords.length > 0 && (
+            <DomainList records={visibleRecords} width={listSize.width} height={listSize.height} />
           )}
         </div>
       </section>
