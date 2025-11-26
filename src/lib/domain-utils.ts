@@ -196,6 +196,41 @@ const COMMON_SUFFIXES = [
   'works',
   'yard'
 ];
+const NEGATIVE_WORDS = new Set([
+  'spam',
+  'scam',
+  'fraud',
+  'hack',
+  'hacker',
+  'crack',
+  'warez',
+  'torrent',
+  'adult',
+  'xxx',
+  'nsfw',
+  'escort',
+  'casino',
+  'bet',
+  'bets',
+  'gamble',
+  'gambling',
+  'poker',
+  'lotto',
+  'lottery',
+  'drug',
+  'drugs',
+  'cialis',
+  'viagra',
+  'loan',
+  'loans',
+  'debt',
+  'payday',
+  'forex',
+  'binary',
+  'click',
+  'virus',
+  'malware'
+]);
 
 type ScoreInput = {
   length: number;
@@ -237,23 +272,57 @@ const tokenizeDomain = (sld: string): string[] =>
 const humanLikeWordScore = (tokens: string[]): { hasHumanWords: boolean; score: number } => {
   let score = 0;
   let hasHuman = false;
+  let hasNegative = false;
+  let isNoisy = false;
 
   const looksLikeWord = (word: string): boolean => inDictionary(word) || COMMON_WORDS.has(word);
 
   const compoundScore = (word: string): number => {
-    // Try to split a long token into two dictionary words.
-    if (word.length < 6) return 0;
-    for (let i = 3; i <= word.length - 3; i++) {
+    // Try to split a token into two plausible halves.
+    if (word.length < 5) return 0;
+    for (let i = 3; i <= word.length - 2; i++) {
       const left = word.slice(0, i);
       const right = word.slice(i);
-      if (looksLikeWord(left) && looksLikeWord(right)) return 5;
+      if (looksLikeWord(left) && looksLikeWord(right)) return 6;
     }
     return 0;
+  };
+
+  const substringHit = (word: string): boolean => {
+    // Accept words that contain a dictionary fragment (len >= 3) anywhere.
+    for (let len = Math.min(6, word.length); len >= 3; len--) {
+      for (let i = 0; i <= word.length - len; i++) {
+        const fragment = word.slice(i, i + len);
+        if (looksLikeWord(fragment)) return true;
+      }
+    }
+    return false;
   };
 
   for (const token of tokens) {
     if (token.length < 3) continue;
     const lower = token.toLowerCase();
+    if (NEGATIVE_WORDS.has(lower)) {
+      hasNegative = true;
+      continue;
+    }
+
+    if (/(.)\1\1/.test(lower)) {
+      isNoisy = true; // long repeated letters like aaa, ccc
+    }
+
+    if (/([aeiou])\1/.test(lower)) {
+      isNoisy = true; // repeated vowel sequences like aa, ee, oo
+    }
+
+    if (/[aeiou]{3,}/.test(lower)) {
+      isNoisy = true; // three or more vowels together
+    }
+
+    if (/[bcdfghjklmnpqrstvwxyz]{3,}/.test(lower)) {
+      isNoisy = true; // three or more consonants together
+    }
+
     const vowelCount = (lower.match(/[aeiou]/g) ?? []).length;
     const consonantCount = lower.length - vowelCount;
     const vowelRatio = vowelCount / lower.length;
@@ -265,14 +334,28 @@ const humanLikeWordScore = (tokens: string[]): { hasHumanWords: boolean; score: 
     if (dictHit) {
       tokenScore += 12;
       hasHuman = true;
+    } else if (substringHit(lower)) {
+      tokenScore += 9;
+      hasHuman = true;
     } else {
       tokenScore += compoundScore(lower);
+      if (compoundScore(lower) > 0) {
+        hasHuman = true;
+      }
     }
 
-    if (vowelRatio >= 0.25 && vowelRatio <= 0.8) {
-      tokenScore += 4;
+    const pronounceable =
+      vowelCount > 0 &&
+      consonantCount > 0 &&
+      vowelRatio >= 0.18 &&
+      vowelRatio <= 0.82 &&
+      !/[bcdfghjklmnpqrstvwxyz]{5,}/.test(lower);
+
+    if (pronounceable) {
+      tokenScore += 5;
       hasHuman = true;
     }
+
     if (vowelCount > 0 && consonantCount > 0 && lower.length >= 5) {
       tokenScore += 2;
     }
@@ -285,7 +368,7 @@ const humanLikeWordScore = (tokens: string[]): { hasHumanWords: boolean; score: 
       hasHuman = true;
     }
     if (longConsonantRun) {
-      tokenScore -= 4;
+      tokenScore -= 3;
     }
 
     score += Math.max(0, tokenScore);
@@ -293,6 +376,10 @@ const humanLikeWordScore = (tokens: string[]): { hasHumanWords: boolean; score: 
 
   if (hasHuman && tokens.length > 1) {
     score += 4; // boost for multi-word expressions
+  }
+
+  if (hasNegative || isNoisy) {
+    return { hasHumanWords: false, score: 0 };
   }
 
   return { hasHumanWords: hasHuman, score };
